@@ -1,0 +1,158 @@
+<html>
+  <input id="input" size="100" value="(id, name, email, type(id, name, customFields(c1, c2, c3)), externalId)"><br><br>
+  <button onclick="run()">Parse</button>
+  <pre id="out"></pre>
+
+  <script>
+
+        // for this excercise we will call '(', ')', and ',' operators, 
+        // and we will call string attributes such as 'name', 'customFields()' tokens. 
+
+
+    function run() {
+      // get the input value
+      const input = document.getElementById('input').value.trim();
+
+      // strip outer parens if present
+      let raw = input;
+      while (raw.startsWith('(') && raw.endsWith(')')) raw = raw.slice(1, -1);
+
+      // check for edge cases and invalid input
+      const error = validate(raw);
+      if (error) { document.getElementById('out').textContent = error; return; }
+
+      // main function - parse, called recursively using depth
+      function parse(str, depth = 0, sortResults = false) {
+
+        // list of strings
+        const tokens = [];
+
+        // final output
+        let out = '';
+
+        // d = depth tracking for current token, start = start index of current token
+        let d = 0, start = 0;
+
+        for (let i = 0; i <= str.length; i++) {
+          
+          // current char
+          const c = str[i];
+
+          // at boundary operator at same depth (or end of string), push token to array
+          if ((c === ',' && d === 0) || i === str.length) { tokens.push(str.slice(start, i).trim()); start = i + 1; }
+
+          // encountered operator - open paren, increase depth
+          if (c === '(') d++;
+
+          // encountered operator - close paren, decrease depth
+          else if (c === ')') d--;
+        }
+
+        // we now have all tokens at current depth, stored as strings with mixed complexity - ex. ["id", "type(id, name)"]
+        
+        // sort if needed
+        if (sortResults) tokens.sort();
+
+        for (const t of tokens) {
+
+          // check if is a parent by checking if token contains parenthesis/children, such as "type(id, name)", -1 if none
+          const p = t.indexOf('(');
+
+          // name is everything before '(' - "type(id, name)" becomes "type"
+          const name = p < 0 ? t : t.slice(0, p);
+
+          // print with indent equal to our current recursion depth (first run - indent 0 times)
+          out += '  '.repeat(depth) + '- ' + name + '\n';
+
+          // if there are children
+          if (p >= 0) {
+
+            // strip the outer parens to get just the inner content - "type(id, name)" becomes "id, name"
+            const children = t.slice(p + 1, -1);
+
+            // recursion time! - parse the children string, now one indent level deeper
+            out += parse(children, depth + 1, sortResults);
+          }
+        }
+        return out;
+      }
+
+      // update with results 
+      const original = parse(raw).trimEnd();
+      const sorted = parse(raw, 0, true).trimEnd();
+      document.getElementById('out').textContent = 'Original:\n' + original + '\n\nSorted:\n' + sorted;
+    }
+
+    function validate(str) {
+      // empty input
+      if (!str || str.trim() === '') return 'Error: input is empty';
+
+      // only allow letters, numbers, underscores, spaces, commas, and parens
+      const allowed = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_, ()';
+      for (const c of str) {
+        if (!allowed.includes(c)) return 'Error: invalid character "' + c + '"';
+      }
+
+      // if input starts with '(' it must also end with ')' - catches trailing content like "(id)asdf"
+      if (str.startsWith('(') && !str.endsWith(')')) return 'Error: unexpected content after ")"';
+
+      // check for mismatched parens by tracking depth
+      let d = 0;
+      for (const c of str) {
+        if (c === '(') d++;
+        else if (c === ')') d--;
+
+        // depth went negative - closing paren with no matching open
+        if (d < 0) return 'Error: unexpected ")"';
+      }
+
+      // depth never returned to 0 - unclosed paren
+      if (d !== 0) return 'Error: unclosed "("';
+
+      // check for empty groups like "type()"
+      if (str.includes('()')) return 'Error: empty group "()"';
+
+      // check for empty tokens and duplicate names at the same level only (not across nested groups)
+      function checkTokens(str) {
+        const names = [];
+        let d = 0, start = 0;
+
+        for (let i = 0; i <= str.length; i++) {
+          const c = str[i];
+
+          if ((c === ',' && d === 0) || i === str.length) {
+            const token = str.slice(start, i).trim();
+            const p = token.indexOf('(');
+            const name = p < 0 ? token : token.slice(0, p);
+
+            // empty token - blank or whitespace between commas
+            if (name === '') return 'Error: empty token between commas';
+
+            // if token has a '(' it must end with ')' - catches malformed tokens like "customF(ie)lds"
+            if (p >= 0 && token[token.length - 1] !== ')') return 'Error: invalid token "' + name + '"';
+
+            // name (part before '(') must not contain ')' - catches "customF(ie)lds(c1,c2)"
+            if (name.includes(')')) return 'Error: invalid token "' + name + '"';
+
+            // duplicate found at this level
+            if (names.includes(name)) return 'Error: duplicate field "' + name + '"';
+            names.push(name);
+
+            // recurse into children to check for duplicates within that group
+            if (p >= 0) { const err = checkTokens(token.slice(p + 1, -1)); if (err) return err; }
+            start = i + 1;
+          }
+
+          if (c === '(') d++;
+          else if (c === ')') d--;
+        }
+        return null;
+      }
+
+      const tokenError = checkTokens(str);
+      if (tokenError) return tokenError;
+
+      return null; // null = valid
+    }
+  </script>
+</html>
