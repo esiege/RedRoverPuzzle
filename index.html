@@ -1,6 +1,6 @@
 <html>
   <input id="input" size="100" value="(id, name, email, type(id, name, customFields(c1, c2, c3)), externalId)"><br><br>
-  <button onclick="run()">Parse</button>
+  <button onclick="run()">Run</button>
   <pre id="out"></pre>
 
   <script>
@@ -13,7 +13,7 @@
       // get the input value
       const input = document.getElementById('input').value.trim();
 
-      // strip outer parens if present
+      // strip outer parens if present (strip multiple sets if they exist)
       let raw = input;
       while (raw.startsWith('(') && raw.endsWith(')')) raw = raw.slice(1, -1);
 
